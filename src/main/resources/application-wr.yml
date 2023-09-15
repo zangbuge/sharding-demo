@@ -1,0 +1,75 @@
+server:
+  port: 8080
+  tomcat:
+    uri-encoding: utf-8
+  servlet:
+    encoding:
+      charset: UTF-8
+
+logging:
+  level:
+    com.jcl.sharing: info
+
+spring:
+  application:
+    name: sharing-jdbc-sample
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    # ?????????
+    default-property-inclusion: non_null
+  # sharding ??
+  shardingsphere:
+    # 打印 sharding 的 sql 信息
+    props:
+      sql:
+        show: true
+    datasource:
+      names: ds0master,ds0slave
+      ds0master:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbcUrl: jdbc:mysql://localhost:3306/master_order?serverTimezone=Asia/Shanghai&useSSL=true&characterEncoding=utf8
+        username: root
+        password: 123456
+      ds0slave:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbcUrl: jdbc:mysql://192.168.1.6:3306/slave_order?serverTimezone=Asia/Shanghai&useSSL=true&characterEncoding=utf8
+        username: root
+        password: 123456
+    # 分片表的读写分离配置
+    sharding:
+      master-slave-rules:
+        # 自定义一个读写分离的数据源名称
+        ms:
+          name: ms
+          # 写数据源
+          masterDataSourceName: ds0master
+          # 读数据源列表
+          slaveDataSourceNames:
+            - ds0slave
+          # 读写分离负载均衡
+          loadBalanceAlgorithmType: round_robin
+      tables:
+        m_order:
+          # 实际节点, 前面的数据节点需要指定读写分离规则里面的数据源名称
+          # 由于这里只有一个读写分离规则，所以写死这个数据贵
+          actual-data-nodes: ms.m_order_$->{0..1}
+          # 数据库分片策略
+          #          database-strategy:
+          #            inline:
+          #              sharding-column: id
+          #              algorithm-expression: ds$->{user_id % 2}
+          # 表分片策略
+          table-strategy:
+            inline:
+              sharding-column: id
+              # 偶数分到 m_order_0，奇数分到 m_order_1
+              algorithm-expression: m_order_$->{id % 2}
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    # ??sql
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  mapper-locations: /mapper/*.xml
